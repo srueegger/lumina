@@ -13,6 +13,7 @@ use crate::model::style::{Color, FillStyle, FontStyle, StrokeStyle};
 use crate::model::text::{TextAlignment, TextElement, TextParagraph, TextRun};
 use crate::ui::canvas::tool::Tool;
 use crate::ui::canvas_view::CanvasView;
+use crate::ui::properties_panel::PropertiesPanel;
 use crate::ui::slide_panel::SlidePanel;
 
 mod imp {
@@ -22,6 +23,7 @@ mod imp {
         pub document: Rc<RefCell<Document>>,
         pub canvas: CanvasView,
         pub slide_panel: SlidePanel,
+        pub properties_panel: PropertiesPanel,
         pub header: adw::HeaderBar,
         pub tool_buttons: RefCell<Vec<(Tool, gtk::ToggleButton)>>,
     }
@@ -38,6 +40,7 @@ mod imp {
                 document: Rc::new(RefCell::new(Document::new())),
                 canvas: CanvasView::new(),
                 slide_panel: SlidePanel::new(),
+                properties_panel: PropertiesPanel::new(),
                 header: adw::HeaderBar::new(),
                 tool_buttons: RefCell::new(Vec::new()),
             }
@@ -120,31 +123,46 @@ impl LuminaWindow {
         let main_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
         main_box.append(&imp.header);
 
-        // Content area: sidebar + canvas
-        let paned = gtk::Paned::new(gtk::Orientation::Horizontal);
-        paned.set_vexpand(true);
-        paned.set_position(220);
-        paned.set_shrink_start_child(false);
-        paned.set_shrink_end_child(false);
-        paned.set_resize_start_child(false);
+        // Content area: sidebar + canvas + properties
+        let left_paned = gtk::Paned::new(gtk::Orientation::Horizontal);
+        left_paned.set_vexpand(true);
+        left_paned.set_position(220);
+        left_paned.set_shrink_start_child(false);
+        left_paned.set_shrink_end_child(false);
+        left_paned.set_resize_start_child(false);
 
         // Sidebar
         let sidebar_frame = gtk::Frame::new(None);
         sidebar_frame.set_child(Some(&imp.slide_panel));
         sidebar_frame.set_width_request(180);
-        paned.set_start_child(Some(&sidebar_frame));
+        left_paned.set_start_child(Some(&sidebar_frame));
+
+        // Right paned: canvas + properties panel
+        let right_paned = gtk::Paned::new(gtk::Orientation::Horizontal);
+        right_paned.set_shrink_start_child(false);
+        right_paned.set_shrink_end_child(false);
+        right_paned.set_resize_end_child(false);
 
         // Canvas
         imp.canvas.set_hexpand(true);
         imp.canvas.set_vexpand(true);
-        paned.set_end_child(Some(&imp.canvas));
+        right_paned.set_start_child(Some(&imp.canvas));
 
-        main_box.append(&paned);
+        // Properties panel
+        let props_frame = gtk::Frame::new(None);
+        props_frame.set_child(Some(&imp.properties_panel));
+        props_frame.set_width_request(240);
+        right_paned.set_end_child(Some(&props_frame));
+
+        left_paned.set_end_child(Some(&right_paned));
+
+        main_box.append(&left_paned);
         self.set_content(Some(&main_box));
 
         // Connect document
         imp.slide_panel.set_document(doc.clone());
         imp.canvas.set_document(doc.clone());
+        imp.properties_panel.set_document(doc.clone());
 
         // Slide selection
         let canvas = imp.canvas.clone();
@@ -152,10 +170,22 @@ impl LuminaWindow {
             canvas.set_current_slide(index);
         });
 
-        // Refresh thumbnails when selection changes (element created/deleted)
+        // Refresh thumbnails and properties panel when selection changes
         let panel_for_sel = imp.slide_panel.clone();
-        imp.canvas.connect_selection_changed(move |_| {
+        let props_for_sel = imp.properties_panel.clone();
+        let canvas_for_sel = imp.canvas.clone();
+        imp.canvas.connect_selection_changed(move |sel_id| {
             panel_for_sel.queue_draw_all();
+            props_for_sel.set_slide_index(canvas_for_sel.current_slide_index());
+            props_for_sel.update_for_selection(sel_id);
+        });
+
+        // When properties change, redraw canvas and thumbnails
+        let canvas_for_props = imp.canvas.clone();
+        let panel_for_props = imp.slide_panel.clone();
+        imp.properties_panel.connect_property_changed(move || {
+            canvas_for_props.queue_draw();
+            panel_for_props.queue_draw_all();
         });
 
         // Add slide button
