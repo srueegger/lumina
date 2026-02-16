@@ -7,9 +7,11 @@ use std::rc::Rc;
 use crate::model::document::Document;
 use crate::model::element::SlideElement;
 use crate::model::geometry::Rect;
+use crate::model::image::ImageElement;
 use crate::model::shape::{ShapeElement, ShapeType};
 use crate::model::style::{Color, FillStyle, FontStyle, StrokeStyle};
 use crate::model::text::{TextAlignment, TextElement, TextParagraph, TextRun};
+use crate::ui::canvas::tool::Tool;
 use crate::ui::canvas_view::CanvasView;
 use crate::ui::slide_panel::SlidePanel;
 
@@ -21,6 +23,7 @@ mod imp {
         pub canvas: CanvasView,
         pub slide_panel: SlidePanel,
         pub header: adw::HeaderBar,
+        pub tool_buttons: RefCell<Vec<(Tool, gtk::ToggleButton)>>,
     }
 
     impl std::fmt::Debug for LuminaWindow {
@@ -36,6 +39,7 @@ mod imp {
                 canvas: CanvasView::new(),
                 slide_panel: SlidePanel::new(),
                 header: adw::HeaderBar::new(),
+                tool_buttons: RefCell::new(Vec::new()),
             }
         }
     }
@@ -95,6 +99,13 @@ impl LuminaWindow {
         add_slide_btn.set_tooltip_text(Some("Add Slide"));
         imp.header.pack_start(&add_slide_btn);
 
+        // Separator
+        let sep = gtk::Separator::new(gtk::Orientation::Vertical);
+        imp.header.pack_start(&sep);
+
+        // Tool buttons
+        self.setup_tool_buttons(doc.clone());
+
         // Menu button
         let menu_btn = gtk::MenuButton::new();
         menu_btn.set_icon_name("open-menu-symbolic");
@@ -141,6 +152,12 @@ impl LuminaWindow {
             canvas.set_current_slide(index);
         });
 
+        // Refresh thumbnails when selection changes (element created/deleted)
+        let panel_for_sel = imp.slide_panel.clone();
+        imp.canvas.connect_selection_changed(move |_| {
+            panel_for_sel.queue_draw_all();
+        });
+
         // Add slide button
         let doc_clone = doc.clone();
         let panel_clone = imp.slide_panel.clone();
@@ -165,6 +182,9 @@ impl LuminaWindow {
                 outline-offset: 2px;
                 border-radius: 4px;
             }
+            .tool-active {
+                background: alpha(@accent_color, 0.2);
+            }
             ",
         );
         gtk::style_context_add_provider_for_display(
@@ -172,6 +192,163 @@ impl LuminaWindow {
             &provider,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
+    }
+
+    fn setup_tool_buttons(&self, doc: Rc<RefCell<Document>>) {
+        let imp = self.imp();
+
+        let tools: Vec<(Tool, &str, &str)> = vec![
+            (Tool::Pointer, "edit-select-symbolic", "Pointer (Esc)"),
+            (Tool::Text, "insert-text-symbolic", "Text"),
+            (
+                Tool::Shape(ShapeType::Rectangle),
+                "checkbox-symbolic",
+                "Rectangle",
+            ),
+            (
+                Tool::Shape(ShapeType::Ellipse),
+                "color-select-symbolic",
+                "Ellipse",
+            ),
+            (
+                Tool::Shape(ShapeType::Line),
+                "format-text-strikethrough-symbolic",
+                "Line",
+            ),
+            (Tool::Image, "insert-image-symbolic", "Image"),
+        ];
+
+        let pointer_btn = gtk::ToggleButton::new();
+        pointer_btn.set_icon_name(tools[0].1);
+        pointer_btn.set_tooltip_text(Some(tools[0].2));
+        pointer_btn.set_active(true);
+        imp.header.pack_start(&pointer_btn);
+
+        let mut all_buttons: Vec<(Tool, gtk::ToggleButton)> = vec![];
+        all_buttons.push((Tool::Pointer, pointer_btn.clone()));
+
+        for (tool, icon, tooltip) in tools.iter().skip(1) {
+            let btn = gtk::ToggleButton::new();
+            btn.set_icon_name(icon);
+            btn.set_tooltip_text(Some(tooltip));
+            btn.set_group(Some(&pointer_btn));
+            imp.header.pack_start(&btn);
+            all_buttons.push((*tool, btn));
+        }
+
+        // Connect tool button clicks
+        let canvas = imp.canvas.clone();
+        let doc_for_image = doc;
+        let buttons_rc = Rc::new(RefCell::new(all_buttons.clone()));
+
+        for (tool, btn) in &all_buttons {
+            let tool = *tool;
+            let canvas = canvas.clone();
+            let doc_for_image = doc_for_image.clone();
+            let buttons = buttons_rc.clone();
+
+            btn.connect_toggled(move |btn| {
+                if !btn.is_active() {
+                    return;
+                }
+
+                if matches!(tool, Tool::Image) {
+                    // Image tool: open file chooser immediately, then reset to pointer
+                    Self::open_image_dialog(&canvas, &doc_for_image, &buttons);
+                    return;
+                }
+
+                canvas.set_current_tool(tool);
+            });
+        }
+
+        // Listen for tool changes from canvas (e.g., after element creation)
+        let buttons_for_cb = buttons_rc;
+        imp.canvas.connect_tool_changed(move |tool| {
+            let buttons = buttons_for_cb.borrow();
+            for (t, btn) in buttons.iter() {
+                if *t == tool {
+                    btn.set_active(true);
+                    break;
+                }
+            }
+        });
+
+        *imp.tool_buttons.borrow_mut() = all_buttons;
+    }
+
+    fn open_image_dialog(
+        canvas: &CanvasView,
+        doc: &Rc<RefCell<Document>>,
+        buttons: &Rc<RefCell<Vec<(Tool, gtk::ToggleButton)>>>,
+    ) {
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some("Images"));
+        filter.add_mime_type("image/png");
+        filter.add_mime_type("image/jpeg");
+        filter.add_mime_type("image/svg+xml");
+        filter.add_mime_type("image/webp");
+
+        let filters = gio::ListStore::new::<gtk::FileFilter>();
+        filters.append(&filter);
+
+        let dialog = gtk::FileDialog::builder()
+            .title("Insert Image")
+            .filters(&filters)
+            .build();
+
+        let canvas = canvas.clone();
+        let doc = doc.clone();
+        let buttons = buttons.clone();
+
+        let window = canvas
+            .root()
+            .and_then(|r| r.downcast::<gtk::Window>().ok());
+
+        dialog.open(window.as_ref(), gio::Cancellable::NONE, move |result| {
+            // Reset to pointer tool regardless
+            canvas.set_current_tool(Tool::Pointer);
+            let btns = buttons.borrow();
+            for (t, btn) in btns.iter() {
+                if matches!(t, Tool::Pointer) {
+                    btn.set_active(true);
+                    break;
+                }
+            }
+
+            if let Ok(file) = result {
+                if let Some(path) = file.path() {
+                    if let Ok(data) = std::fs::read(&path) {
+                        let mime = match path
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .unwrap_or("")
+                        {
+                            "png" => "image/png",
+                            "jpg" | "jpeg" => "image/jpeg",
+                            "svg" => "image/svg+xml",
+                            "webp" => "image/webp",
+                            _ => "image/png",
+                        };
+
+                        let bounds = Rect::new(100.0, 100.0, 400.0, 300.0);
+                        let element = ImageElement::new(bounds, data, mime.to_string());
+                        let element_id = element.id;
+
+                        let idx = canvas.current_slide_index();
+                        {
+                            let mut doc = doc.borrow_mut();
+                            if idx < doc.slides.len() {
+                                doc.slides[idx].add_element(SlideElement::Image(element));
+                            }
+                        }
+
+                        canvas.selection().borrow_mut().select(element_id);
+                        canvas.queue_draw();
+                    }
+                }
+            }
+        });
     }
 }
 

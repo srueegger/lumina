@@ -1,10 +1,12 @@
 use crate::model::geometry::{Point, Rect};
 use crate::ui::canvas::selection::HandlePosition;
+use crate::ui::canvas::tool::Tool;
 
 #[derive(Debug, Clone, Copy)]
 pub enum DragOperation {
     Move { start_x: f64, start_y: f64, orig_bounds: Rect },
     Resize { handle: HandlePosition, orig_bounds: Rect },
+    Create { tool: Tool, start: Point },
 }
 
 impl DragOperation {
@@ -19,8 +21,20 @@ impl DragOperation {
             DragOperation::Resize { handle, orig_bounds } => {
                 resize_bounds(orig_bounds, *handle, dx, dy)
             }
+            DragOperation::Create { start, .. } => {
+                normalize_rect(start.x, start.y, start.x + dx, start.y + dy)
+            }
         }
     }
+}
+
+/// Create a normalized rect from two corners (handles negative width/height from dragging up/left)
+pub fn normalize_rect(x1: f64, y1: f64, x2: f64, y2: f64) -> Rect {
+    let x = x1.min(x2);
+    let y = y1.min(y2);
+    let w = (x2 - x1).abs().max(1.0);
+    let h = (y2 - y1).abs().max(1.0);
+    Rect::new(x, y, w, h)
 }
 
 fn resize_bounds(orig: &Rect, handle: HandlePosition, dx: f64, dy: f64) -> Rect {

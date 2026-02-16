@@ -4,10 +4,14 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use crate::model::document::Document;
-use crate::model::geometry::Size;
+use crate::model::element::SlideElement;
+use crate::model::geometry::{Rect, Size};
+use crate::model::shape::ShapeElement;
+use crate::model::text::TextElement;
 use crate::render::engine;
 use crate::ui::canvas::interaction::{self, DragOperation};
 use crate::ui::canvas::selection::{self, Selection};
+use crate::ui::canvas::tool::Tool;
 
 mod imp {
     use super::*;
@@ -18,7 +22,9 @@ mod imp {
         pub current_slide_index: Cell<usize>,
         pub selection: Rc<RefCell<Selection>>,
         pub drag_op: Rc<RefCell<Option<DragOperation>>>,
+        pub current_tool: Rc<Cell<Tool>>,
         pub on_selection_changed: Rc<RefCell<Option<Box<dyn Fn(Option<uuid::Uuid>)>>>>,
+        pub on_tool_changed: Rc<RefCell<Option<Box<dyn Fn(Tool)>>>>,
     }
 
     impl std::fmt::Debug for CanvasView {
@@ -35,7 +41,9 @@ mod imp {
                 current_slide_index: Cell::new(0),
                 selection: Rc::new(RefCell::new(Selection::new())),
                 drag_op: Rc::new(RefCell::new(None)),
+                current_tool: Rc::new(Cell::new(Tool::Pointer)),
                 on_selection_changed: Rc::new(RefCell::new(None)),
+                on_tool_changed: Rc::new(RefCell::new(None)),
             }
         }
     }
@@ -86,6 +94,8 @@ impl CanvasView {
         let doc_clone = doc.clone();
         let slide_index = imp.current_slide_index.clone();
         let selection = imp.selection.clone();
+        let drag_op_for_draw = imp.drag_op.clone();
+        let current_tool_for_draw = imp.current_tool.clone();
 
         imp.drawing_area
             .set_draw_func(move |_area, cr, width, height| {
@@ -131,6 +141,8 @@ impl CanvasView {
                     }
                 }
 
+                let _ = (&drag_op_for_draw, &current_tool_for_draw);
+
                 cr.restore().expect("cairo restore");
             });
 
@@ -150,8 +162,16 @@ impl CanvasView {
         let slide_index = imp.current_slide_index.clone();
         let drawing_area = imp.drawing_area.clone();
         let on_changed = imp.on_selection_changed.clone();
+        let current_tool = imp.current_tool.clone();
 
         gesture.connect_pressed(move |_gesture, _n_press, x, y| {
+            let tool = current_tool.get();
+
+            // For creation tools, clicking is handled by drag handler
+            if !matches!(tool, Tool::Pointer) {
+                return;
+            }
+
             let doc = doc.borrow();
             let idx = slide_index.get();
             if idx >= doc.slides.len() {
@@ -167,11 +187,6 @@ impl CanvasView {
             let slide_point = interaction::widget_to_slide_coords(x, y, scale, offset_x, offset_y);
 
             let mut sel = selection.borrow_mut();
-
-            // Check if clicking on a handle of the selected element
-            if sel.has_selection() {
-                // Try to find the element under the cursor
-            }
 
             if let Some((_idx, element)) = slide.find_element_at(slide_point) {
                 sel.select(element.id());
@@ -200,14 +215,16 @@ impl CanvasView {
         let drag_op = imp.drag_op.clone();
         let slide_index = imp.current_slide_index.clone();
         let drawing_area = imp.drawing_area.clone();
+        let current_tool = imp.current_tool.clone();
         let doc_for_drag = doc.clone();
         let doc_for_update = doc.clone();
-        let _doc_for_end = doc;
+        let doc_for_end = doc;
 
         let selection_start = selection.clone();
         let drag_op_start = drag_op.clone();
         let slide_index_start = slide_index.clone();
         let drawing_area_start = drawing_area.clone();
+        let current_tool_start = current_tool.clone();
 
         gesture.connect_drag_begin(move |_gesture, x, y| {
             let doc = doc_for_drag.borrow();
@@ -224,9 +241,20 @@ impl CanvasView {
 
             let slide_point = interaction::widget_to_slide_coords(x, y, scale, offset_x, offset_y);
 
+            let tool = current_tool_start.get();
+
+            // Creation tools: start a create drag
+            if !matches!(tool, Tool::Pointer) {
+                *drag_op_start.borrow_mut() = Some(DragOperation::Create {
+                    tool,
+                    start: slide_point,
+                });
+                return;
+            }
+
+            // Pointer tool: move/resize existing elements
             let sel = selection_start.borrow();
             if let Some(sel_id) = sel.element_id {
-                // Check if we're on a resize handle
                 for element in &slide.elements {
                     if element.id() == sel_id {
                         if let Some(handle) =
@@ -239,7 +267,6 @@ impl CanvasView {
                             return;
                         }
 
-                        // Check if we're on the element itself (move)
                         if element.bounds().contains(slide_point) {
                             *drag_op_start.borrow_mut() = Some(DragOperation::Move {
                                 start_x: slide_point.x,
@@ -261,6 +288,17 @@ impl CanvasView {
         gesture.connect_drag_update(move |_gesture, offset_x, offset_y| {
             let op = drag_op_update.borrow();
             if op.is_none() {
+                return;
+            }
+
+            let is_create = matches!(op.as_ref(), Some(DragOperation::Create { .. }));
+
+            if is_create {
+                // For creation, just redraw to show preview
+                drop(op);
+                // We update the drag offset in a different way for create:
+                // store the offset so draw_func can compute the preview rect
+                drawing_area_update.queue_draw();
                 return;
             }
 
@@ -296,10 +334,74 @@ impl CanvasView {
             drawing_area_update.queue_draw();
         });
 
-        let drag_op_end = drag_op;
+        let drag_op_end = drag_op.clone();
+        let selection_end = selection;
+        let slide_index_end = slide_index;
+        let drawing_area_end = drawing_area.clone();
+        let current_tool_end = current_tool.clone();
+        let on_changed_end = imp.on_selection_changed.clone();
+        let on_tool_changed_end = imp.on_tool_changed.clone();
 
-        gesture.connect_drag_end(move |_gesture, _, _| {
+        gesture.connect_drag_end(move |gesture, offset_x, offset_y| {
+            let op = drag_op_end.borrow().clone();
             *drag_op_end.borrow_mut() = None;
+
+            if let Some(DragOperation::Create { tool, start }) = op {
+                let slide_size;
+                let scale;
+                {
+                    let doc = doc_for_end.borrow();
+                    slide_size = doc.slide_size;
+                    let width = drawing_area_end.width() as f64;
+                    let height = drawing_area_end.height() as f64;
+                    let transform = compute_slide_transform(&slide_size, width, height);
+                    scale = transform.0;
+                }
+
+                let dx = offset_x / scale;
+                let dy = offset_y / scale;
+
+                // Require minimum drag distance to create element
+                if dx.abs() < 5.0 && dy.abs() < 5.0 {
+                    return;
+                }
+
+                let bounds = interaction::normalize_rect(
+                    start.x,
+                    start.y,
+                    start.x + dx,
+                    start.y + dy,
+                );
+
+                let element = create_element_for_tool(tool, bounds);
+                if let Some(element) = element {
+                    let element_id = element.id();
+                    {
+                        let mut doc = doc_for_end.borrow_mut();
+                        let idx = slide_index_end.get();
+                        if idx < doc.slides.len() {
+                            doc.slides[idx].add_element(element);
+                        }
+                    }
+
+                    // Select the newly created element
+                    selection_end.borrow_mut().select(element_id);
+                    if let Some(cb) = on_changed_end.borrow().as_ref() {
+                        cb(Some(element_id));
+                    }
+
+                    // Switch back to pointer tool
+                    current_tool_end.set(Tool::Pointer);
+                    if let Some(cb) = on_tool_changed_end.borrow().as_ref() {
+                        cb(Tool::Pointer);
+                    }
+                }
+
+                drawing_area_end.queue_draw();
+
+                // Cancel the gesture to avoid interfering with click handler
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+            }
         });
 
         imp.drawing_area.add_controller(gesture);
@@ -313,6 +415,8 @@ impl CanvasView {
         let slide_index = imp.current_slide_index.clone();
         let drawing_area = imp.drawing_area.clone();
         let on_changed = imp.on_selection_changed.clone();
+        let current_tool = imp.current_tool.clone();
+        let on_tool_changed = imp.on_tool_changed.clone();
 
         key_controller.connect_key_pressed(move |_, keyval, _, _| {
             if keyval == gdk::Key::Delete || keyval == gdk::Key::BackSpace {
@@ -332,6 +436,16 @@ impl CanvasView {
                 return glib::Propagation::Stop;
             }
             if keyval == gdk::Key::Escape {
+                // If a creation tool is active, switch back to pointer
+                let tool = current_tool.get();
+                if !matches!(tool, Tool::Pointer) {
+                    current_tool.set(Tool::Pointer);
+                    if let Some(cb) = on_tool_changed.borrow().as_ref() {
+                        cb(Tool::Pointer);
+                    }
+                    return glib::Propagation::Stop;
+                }
+
                 let mut sel = selection.borrow_mut();
                 sel.deselect();
                 if let Some(cb) = on_changed.borrow().as_ref() {
@@ -348,6 +462,18 @@ impl CanvasView {
 
     pub fn connect_selection_changed<F: Fn(Option<uuid::Uuid>) + 'static>(&self, callback: F) {
         *self.imp().on_selection_changed.borrow_mut() = Some(Box::new(callback));
+    }
+
+    pub fn connect_tool_changed<F: Fn(Tool) + 'static>(&self, callback: F) {
+        *self.imp().on_tool_changed.borrow_mut() = Some(Box::new(callback));
+    }
+
+    pub fn set_current_tool(&self, tool: Tool) {
+        self.imp().current_tool.set(tool);
+    }
+
+    pub fn current_tool(&self) -> Tool {
+        self.imp().current_tool.get()
     }
 
     pub fn set_current_slide(&self, index: usize) {
@@ -385,6 +511,25 @@ impl CanvasView {
 
     pub fn drawing_area(&self) -> &gtk::DrawingArea {
         &self.imp().drawing_area
+    }
+
+    pub fn document(&self) -> Option<Rc<RefCell<Document>>> {
+        self.imp().document.borrow().clone()
+    }
+}
+
+fn create_element_for_tool(tool: Tool, bounds: Rect) -> Option<SlideElement> {
+    match tool {
+        Tool::Pointer => None,
+        Tool::Text => {
+            let text = TextElement::new(bounds, "Text");
+            Some(SlideElement::Text(text))
+        }
+        Tool::Shape(shape_type) => {
+            let shape = ShapeElement::new(bounds, shape_type);
+            Some(SlideElement::Shape(shape))
+        }
+        Tool::Image => None, // Image creation is handled separately via file chooser
     }
 }
 
