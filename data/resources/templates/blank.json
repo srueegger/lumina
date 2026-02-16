@@ -1,0 +1,10 @@
+{
+    "name": "Blank",
+    "description": "Empty white slide",
+    "slides": [
+        {
+            "background": "#ffffff",
+            "elements": []
+        }
+    ]
+}

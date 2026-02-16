@@ -6,6 +6,7 @@ use std::rc::Rc;
 
 use crate::format::odp;
 use crate::render::pdf_export;
+use crate::templates;
 use crate::model::document::Document;
 use crate::model::element::SlideElement;
 use crate::model::geometry::Rect;
@@ -123,6 +124,7 @@ impl LuminaWindow {
 
         let menu = gio::Menu::new();
         let file_section = gio::Menu::new();
+        file_section.append(Some("New..."), Some("win.new-presentation"));
         file_section.append(Some("Open..."), Some("win.open"));
         file_section.append(Some("Save"), Some("win.save"));
         file_section.append(Some("Save As..."), Some("win.save-as"));
@@ -431,7 +433,32 @@ impl LuminaWindow {
             })
             .build();
 
-        self.add_action_entries([save_action, save_as_action, open_action, export_pdf_action]);
+        // New presentation action
+        let new_action = gio::ActionEntry::builder("new-presentation")
+            .activate({
+                let doc = doc;
+                let file_path = imp.file_path.clone();
+                let title_widget = imp.title_widget.clone();
+                let slide_panel = imp.slide_panel.clone();
+                let canvas = imp.canvas.clone();
+                let props = imp.properties_panel.clone();
+                move |win: &LuminaWindow, _, _| {
+                    let all_templates = templates::built_in_templates();
+                    show_template_dialog(
+                        win,
+                        &all_templates,
+                        &doc,
+                        &file_path,
+                        &title_widget,
+                        &slide_panel,
+                        &canvas,
+                        &props,
+                    );
+                }
+            })
+            .build();
+
+        self.add_action_entries([save_action, save_as_action, open_action, export_pdf_action, new_action]);
     }
 
     fn setup_tool_buttons(&self, doc: Rc<RefCell<Document>>) {
@@ -590,6 +617,63 @@ impl LuminaWindow {
             }
         });
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn show_template_dialog(
+    win: &LuminaWindow,
+    all_templates: &[templates::TemplateDefinition],
+    doc: &Rc<RefCell<Document>>,
+    file_path: &Rc<RefCell<Option<std::path::PathBuf>>>,
+    title_widget: &RefCell<Option<adw::WindowTitle>>,
+    slide_panel: &SlidePanel,
+    canvas: &CanvasView,
+    props: &PropertiesPanel,
+) {
+    let dialog = adw::AlertDialog::builder()
+        .heading("New Presentation")
+        .body("Choose a template:")
+        .build();
+
+    for (i, template) in all_templates.iter().enumerate() {
+        dialog.add_response(&format!("tmpl_{}", i), &template.name);
+    }
+    dialog.add_response("cancel", "Cancel");
+    dialog.set_default_response(Some("tmpl_0"));
+    dialog.set_close_response("cancel");
+
+    let doc = doc.clone();
+    let file_path = file_path.clone();
+    let title_widget = title_widget.clone();
+    let slide_panel = slide_panel.clone();
+    let canvas = canvas.clone();
+    let props = props.clone();
+    let template_data: Vec<String> = all_templates
+        .iter()
+        .map(|t| serde_json::to_string(t).unwrap_or_default())
+        .collect();
+
+    dialog.connect_response(None, move |_dialog, response| {
+        if response.starts_with("tmpl_") {
+            if let Ok(idx) = response[5..].parse::<usize>() {
+                if let Some(json) = template_data.get(idx) {
+                    if let Ok(template) = serde_json::from_str::<templates::TemplateDefinition>(json) {
+                        let new_doc = templates::create_document_from_template(&template);
+                        *doc.borrow_mut() = new_doc;
+                        *file_path.borrow_mut() = None;
+                        if let Some(title) = title_widget.borrow().as_ref() {
+                            title.set_subtitle("Untitled Presentation");
+                        }
+                        slide_panel.rebuild_thumbnails();
+                        canvas.set_current_slide(0);
+                        props.update_for_selection(None);
+                    }
+                }
+            }
+        }
+    });
+
+    dialog.present(Some(win));
 }
 
 fn create_demo_document() -> Document {

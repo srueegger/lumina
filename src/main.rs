@@ -4,6 +4,7 @@ mod format;
 mod i18n;
 mod model;
 mod render;
+mod templates;
 mod ui;
 
 use gtk::prelude::*;
