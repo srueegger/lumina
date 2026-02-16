@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>@APP_ID@</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-only</project_license>
+
+  <name>Lumina</name>
+  <summary>Create and edit presentations</summary>
+
+  <description>
+    <p>
+      Lumina is a modern presentation application for the GNOME desktop.
+      Inspired by Apple Keynote, it provides a clean and intuitive interface
+      for creating beautiful presentations.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Create presentations with text, images, and shapes</li>
+      <li>Save in Open Document Presentation format (ODP)</li>
+      <li>Import PowerPoint files (PPTX)</li>
+      <li>Export to PDF</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">@APP_ID@.desktop</launchable>
+
+  <url type="homepage">https://github.com/srueegger/lumina</url>
+  <url type="bugtracker">https://github.com/srueegger/lumina/issues</url>
+
+  <developer id="me.rueegger">
+    <name>Samuel Rüegger</name>
+  </developer>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#f5c211</color>
+    <color type="primary" scheme_preference="dark">#a48102</color>
+  </branding>
+
+  <content_rating type="oars-1.1" />
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+
+  <releases>
+    <release version="0.1.0" date="2026-02-16">
+      <description>
+        <p>Initial release of Lumina.</p>
+      </description>
+    </release>
+  </releases>
+</component>
