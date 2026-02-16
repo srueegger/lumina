@@ -1,5 +1,6 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use gettextrs::gettext;
 use gtk::gio;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -101,13 +102,13 @@ impl LuminaWindow {
         let doc = Rc::new(RefCell::new(doc));
 
         // Header bar
-        let title = adw::WindowTitle::new("Lumina", "Untitled Presentation");
+        let title = adw::WindowTitle::new("Lumina", &gettext("Untitled Presentation"));
         imp.header.set_title_widget(Some(&title));
         *imp.title_widget.borrow_mut() = Some(title);
 
         // Add slide button in header
         let add_slide_btn = gtk::Button::from_icon_name("list-add-symbolic");
-        add_slide_btn.set_tooltip_text(Some("Add Slide"));
+        add_slide_btn.set_tooltip_text(Some(&gettext("Add Slide")));
         imp.header.pack_start(&add_slide_btn);
 
         // Separator
@@ -120,20 +121,20 @@ impl LuminaWindow {
         // Menu button
         let menu_btn = gtk::MenuButton::new();
         menu_btn.set_icon_name("open-menu-symbolic");
-        menu_btn.set_tooltip_text(Some("Menu"));
+        menu_btn.set_tooltip_text(Some(&gettext("Menu")));
 
         let menu = gio::Menu::new();
         let file_section = gio::Menu::new();
-        file_section.append(Some("New..."), Some("win.new-presentation"));
-        file_section.append(Some("Open..."), Some("win.open"));
-        file_section.append(Some("Save"), Some("win.save"));
-        file_section.append(Some("Save As..."), Some("win.save-as"));
+        file_section.append(Some(&gettext("New...")), Some("win.new-presentation"));
+        file_section.append(Some(&gettext("Open...")), Some("win.open"));
+        file_section.append(Some(&gettext("Save")), Some("win.save"));
+        file_section.append(Some(&gettext("Save As...")), Some("win.save-as"));
         menu.append_section(None, &file_section);
         let export_section = gio::Menu::new();
-        export_section.append(Some("Export as PDF..."), Some("win.export-pdf"));
+        export_section.append(Some(&gettext("Export as PDF...")), Some("win.export-pdf"));
         menu.append_section(None, &export_section);
         let about_section = gio::Menu::new();
-        about_section.append(Some("About Lumina"), Some("app.about"));
+        about_section.append(Some(&gettext("About Lumina")), Some("app.about"));
         menu.append_section(None, &about_section);
         menu_btn.set_menu_model(Some(&menu));
         imp.header.pack_end(&menu_btn);
@@ -277,7 +278,7 @@ impl LuminaWindow {
                 let title_widget = imp.title_widget.clone();
                 move |win: &LuminaWindow, _, _| {
                     let filter = gtk::FileFilter::new();
-                    filter.set_name(Some("ODP Presentation"));
+                    filter.set_name(Some(&gettext("ODP Presentation")));
                     filter.add_mime_type("application/vnd.oasis.opendocument.presentation");
                     filter.add_pattern("*.odp");
 
@@ -285,7 +286,7 @@ impl LuminaWindow {
                     filters.append(&filter);
 
                     let dialog = gtk::FileDialog::builder()
-                        .title("Save Presentation")
+                        .title(gettext("Save Presentation"))
                         .filters(&filters)
                         .initial_name("presentation.odp")
                         .build();
@@ -327,17 +328,17 @@ impl LuminaWindow {
                 let props = imp.properties_panel.clone();
                 move |win: &LuminaWindow, _, _| {
                     let odp_filter = gtk::FileFilter::new();
-                    odp_filter.set_name(Some("ODP Presentation"));
+                    odp_filter.set_name(Some(&gettext("ODP Presentation")));
                     odp_filter.add_mime_type("application/vnd.oasis.opendocument.presentation");
                     odp_filter.add_pattern("*.odp");
 
                     let pptx_filter = gtk::FileFilter::new();
-                    pptx_filter.set_name(Some("PowerPoint Presentation"));
+                    pptx_filter.set_name(Some(&gettext("PowerPoint Presentation")));
                     pptx_filter.add_mime_type("application/vnd.openxmlformats-officedocument.presentationml.presentation");
                     pptx_filter.add_pattern("*.pptx");
 
                     let all_filter = gtk::FileFilter::new();
-                    all_filter.set_name(Some("All Presentations"));
+                    all_filter.set_name(Some(&gettext("All Presentations")));
                     all_filter.add_pattern("*.odp");
                     all_filter.add_pattern("*.pptx");
 
@@ -347,7 +348,7 @@ impl LuminaWindow {
                     filters.append(&pptx_filter);
 
                     let dialog = gtk::FileDialog::builder()
-                        .title("Open Presentation")
+                        .title(gettext("Open Presentation"))
                         .filters(&filters)
                         .build();
 
@@ -404,7 +405,7 @@ impl LuminaWindow {
                 let doc = doc.clone();
                 move |win: &LuminaWindow, _, _| {
                     let filter = gtk::FileFilter::new();
-                    filter.set_name(Some("PDF Document"));
+                    filter.set_name(Some(&gettext("PDF Document")));
                     filter.add_mime_type("application/pdf");
                     filter.add_pattern("*.pdf");
 
@@ -412,7 +413,7 @@ impl LuminaWindow {
                     filters.append(&filter);
 
                     let dialog = gtk::FileDialog::builder()
-                        .title("Export as PDF")
+                        .title(gettext("Export as PDF"))
                         .filters(&filters)
                         .initial_name("presentation.pdf")
                         .build();
@@ -464,30 +465,30 @@ impl LuminaWindow {
     fn setup_tool_buttons(&self, doc: Rc<RefCell<Document>>) {
         let imp = self.imp();
 
-        let tools: Vec<(Tool, &str, &str)> = vec![
-            (Tool::Pointer, "edit-select-symbolic", "Pointer (Esc)"),
-            (Tool::Text, "insert-text-symbolic", "Text"),
+        let tools: Vec<(Tool, &str, String)> = vec![
+            (Tool::Pointer, "edit-select-symbolic", gettext("Pointer (Esc)")),
+            (Tool::Text, "insert-text-symbolic", gettext("Text")),
             (
                 Tool::Shape(ShapeType::Rectangle),
                 "checkbox-symbolic",
-                "Rectangle",
+                gettext("Rectangle"),
             ),
             (
                 Tool::Shape(ShapeType::Ellipse),
                 "color-select-symbolic",
-                "Ellipse",
+                gettext("Ellipse"),
             ),
             (
                 Tool::Shape(ShapeType::Line),
                 "format-text-strikethrough-symbolic",
-                "Line",
+                gettext("Line"),
             ),
-            (Tool::Image, "insert-image-symbolic", "Image"),
+            (Tool::Image, "insert-image-symbolic", gettext("Image")),
         ];
 
         let pointer_btn = gtk::ToggleButton::new();
         pointer_btn.set_icon_name(tools[0].1);
-        pointer_btn.set_tooltip_text(Some(tools[0].2));
+        pointer_btn.set_tooltip_text(Some(&tools[0].2));
         pointer_btn.set_active(true);
         imp.header.pack_start(&pointer_btn);
 
@@ -550,7 +551,7 @@ impl LuminaWindow {
         buttons: &Rc<RefCell<Vec<(Tool, gtk::ToggleButton)>>>,
     ) {
         let filter = gtk::FileFilter::new();
-        filter.set_name(Some("Images"));
+        filter.set_name(Some(&gettext("Images")));
         filter.add_mime_type("image/png");
         filter.add_mime_type("image/jpeg");
         filter.add_mime_type("image/svg+xml");
@@ -560,7 +561,7 @@ impl LuminaWindow {
         filters.append(&filter);
 
         let dialog = gtk::FileDialog::builder()
-            .title("Insert Image")
+            .title(gettext("Insert Image"))
             .filters(&filters)
             .build();
 
@@ -631,14 +632,14 @@ fn show_template_dialog(
     props: &PropertiesPanel,
 ) {
     let dialog = adw::AlertDialog::builder()
-        .heading("New Presentation")
-        .body("Choose a template:")
+        .heading(gettext("New Presentation"))
+        .body(gettext("Choose a template:"))
         .build();
 
     for (i, template) in all_templates.iter().enumerate() {
         dialog.add_response(&format!("tmpl_{}", i), &template.name);
     }
-    dialog.add_response("cancel", "Cancel");
+    dialog.add_response("cancel", &gettext("Cancel"));
     dialog.set_default_response(Some("tmpl_0"));
     dialog.set_close_response("cancel");
 
@@ -662,7 +663,7 @@ fn show_template_dialog(
                         *doc.borrow_mut() = new_doc;
                         *file_path.borrow_mut() = None;
                         if let Some(title) = title_widget.borrow().as_ref() {
-                            title.set_subtitle("Untitled Presentation");
+                            title.set_subtitle(&gettext("Untitled Presentation"));
                         }
                         slide_panel.rebuild_thumbnails();
                         canvas.set_current_slide(0);

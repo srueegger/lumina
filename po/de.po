@@ -19,3 +19,155 @@ msgstr ""
 #: data/me.rueegger.Lumina.desktop.in.in:3
 msgid "Create and edit presentations"
 msgstr "Präsentationen erstellen und bearbeiten"
+
+#: data/me.rueegger.Lumina.metainfo.xml.in:11
+msgid "Lumina is a modern presentation application for the GNOME desktop. Inspired by Apple Keynote, it provides a clean and intuitive interface for creating beautiful presentations."
+msgstr "Lumina ist eine moderne Präsentationsanwendung für den GNOME-Desktop. Inspiriert von Apple Keynote bietet sie eine übersichtliche und intuitive Oberfläche zum Erstellen ansprechender Präsentationen."
+
+#: src/ui/window.rs
+msgid "Untitled Presentation"
+msgstr "Unbenannte Präsentation"
+
+#: src/ui/window.rs
+msgid "Add Slide"
+msgstr "Folie hinzufügen"
+
+#: src/ui/window.rs
+msgid "Menu"
+msgstr "Menü"
+
+#: src/ui/window.rs
+msgid "New..."
+msgstr "Neu..."
+
+#: src/ui/window.rs
+msgid "Open..."
+msgstr "Öffnen..."
+
+#: src/ui/window.rs
+msgid "Save"
+msgstr "Speichern"
+
+#: src/ui/window.rs
+msgid "Save As..."
+msgstr "Speichern unter..."
+
+#: src/ui/window.rs
+msgid "Export as PDF..."
+msgstr "Als PDF exportieren..."
+
+#: src/ui/window.rs
+msgid "About Lumina"
+msgstr "Über Lumina"
+
+#: src/ui/window.rs
+msgid "Pointer (Esc)"
+msgstr "Zeiger (Esc)"
+
+#: src/ui/window.rs
+msgid "Text"
+msgstr "Text"
+
+#: src/ui/window.rs
+msgid "Rectangle"
+msgstr "Rechteck"
+
+#: src/ui/window.rs
+msgid "Ellipse"
+msgstr "Ellipse"
+
+#: src/ui/window.rs
+msgid "Line"
+msgstr "Linie"
+
+#: src/ui/window.rs
+msgid "Image"
+msgstr "Bild"
+
+#: src/ui/window.rs
+msgid "ODP Presentation"
+msgstr "ODP-Präsentation"
+
+#: src/ui/window.rs
+msgid "Save Presentation"
+msgstr "Präsentation speichern"
+
+#: src/ui/window.rs
+msgid "Open Presentation"
+msgstr "Präsentation öffnen"
+
+#: src/ui/window.rs
+msgid "PowerPoint Presentation"
+msgstr "PowerPoint-Präsentation"
+
+#: src/ui/window.rs
+msgid "All Presentations"
+msgstr "Alle Präsentationen"
+
+#: src/ui/window.rs
+msgid "Export as PDF"
+msgstr "Als PDF exportieren"
+
+#: src/ui/window.rs
+msgid "PDF Document"
+msgstr "PDF-Dokument"
+
+#: src/ui/window.rs
+msgid "Images"
+msgstr "Bilder"
+
+#: src/ui/window.rs
+msgid "Insert Image"
+msgstr "Bild einfügen"
+
+#: src/ui/window.rs
+msgid "New Presentation"
+msgstr "Neue Präsentation"
+
+#: src/ui/window.rs
+msgid "Choose a template:"
+msgstr "Vorlage auswählen:"
+
+#: src/ui/window.rs
+msgid "Cancel"
+msgstr "Abbrechen"
+
+#: src/ui/properties_panel.rs
+msgid "No selection"
+msgstr "Keine Auswahl"
+
+#: src/ui/properties_panel.rs
+msgid "Position & Size"
+msgstr "Position & Grösse"
+
+#: src/ui/properties_panel.rs
+msgid "Font"
+msgstr "Schriftart"
+
+#: src/ui/properties_panel.rs
+msgid "Size"
+msgstr "Grösse"
+
+#: src/ui/properties_panel.rs
+msgid "Style"
+msgstr "Stil"
+
+#: src/ui/properties_panel.rs
+msgid "Color"
+msgstr "Farbe"
+
+#: src/ui/properties_panel.rs
+msgid "Shape"
+msgstr "Form"
+
+#: src/ui/properties_panel.rs
+msgid "Fill"
+msgstr "Füllung"
+
+#: src/ui/properties_panel.rs
+msgid "Stroke"
+msgstr "Kontur"
+
+#: src/ui/properties_panel.rs
+msgid "Width"
+msgstr "Breite"
