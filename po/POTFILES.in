@@ -1,3 +1,4 @@
-src/application.rs
+src/ui/window.rs
+src/ui/properties_panel.rs
 data/me.rueegger.Lumina.desktop.in.in
 data/me.rueegger.Lumina.metainfo.xml.in

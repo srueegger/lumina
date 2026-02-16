@@ -1,3 +1,4 @@
+use gettextrs::gettext;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 use std::cell::RefCell;
@@ -118,7 +119,7 @@ impl PropertiesPanel {
 
         let sel_id = *imp.selected_id.borrow();
         let Some(sel_id) = sel_id else {
-            let label = gtk::Label::new(Some("No selection"));
+            let label = gtk::Label::new(Some(&gettext("No selection")));
             label.add_css_class("dim-label");
             label.set_margin_top(24);
             content.append(&label);
@@ -150,7 +151,7 @@ impl PropertiesPanel {
                 self.build_shape_properties(content, shape);
             }
             SlideElement::Image(_) => {
-                let label = gtk::Label::new(Some("Image"));
+                let label = gtk::Label::new(Some(&gettext("Image")));
                 label.add_css_class("heading");
                 label.set_halign(gtk::Align::Start);
                 content.append(&label);
@@ -162,7 +163,7 @@ impl PropertiesPanel {
         let imp = self.imp();
         let bounds = *element.bounds();
 
-        let section_label = gtk::Label::new(Some("Position & Size"));
+        let section_label = gtk::Label::new(Some(&gettext("Position & Size")));
         section_label.add_css_class("heading");
         section_label.set_halign(gtk::Align::Start);
         content.append(&section_label);
@@ -242,7 +243,7 @@ impl PropertiesPanel {
     ) {
         let imp = self.imp();
 
-        let section_label = gtk::Label::new(Some("Text"));
+        let section_label = gtk::Label::new(Some(&gettext("Text")));
         section_label.add_css_class("heading");
         section_label.set_halign(gtk::Align::Start);
         content.append(&section_label);
@@ -267,7 +268,7 @@ impl PropertiesPanel {
 
         // Font family
         let font_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        let font_label = gtk::Label::new(Some("Font"));
+        let font_label = gtk::Label::new(Some(&gettext("Font")));
         font_label.add_css_class("dim-label");
         font_label.set_width_chars(5);
         font_label.set_halign(gtk::Align::Start);
@@ -310,7 +311,7 @@ impl PropertiesPanel {
 
         // Font size
         let size_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        let size_label = gtk::Label::new(Some("Size"));
+        let size_label = gtk::Label::new(Some(&gettext("Size")));
         size_label.add_css_class("dim-label");
         size_label.set_width_chars(5);
         size_label.set_halign(gtk::Align::Start);
@@ -358,7 +359,7 @@ impl PropertiesPanel {
 
         // Bold / Italic toggles
         let style_row = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-        let style_label = gtk::Label::new(Some("Style"));
+        let style_label = gtk::Label::new(Some(&gettext("Style")));
         style_label.add_css_class("dim-label");
         style_label.set_width_chars(5);
         style_label.set_halign(gtk::Align::Start);
@@ -441,7 +442,7 @@ impl PropertiesPanel {
         content.append(&style_row);
 
         // Text color
-        self.build_color_row(content, "Color", &text_color, move |color| {
+        self.build_color_row(content, &gettext("Color"), &text_color, move |color| {
             // Color change callback - will be wired separately
             color
         });
@@ -454,7 +455,7 @@ impl PropertiesPanel {
     ) {
         let imp = self.imp();
 
-        let section_label = gtk::Label::new(Some("Shape"));
+        let section_label = gtk::Label::new(Some(&gettext("Shape")));
         section_label.add_css_class("heading");
         section_label.set_halign(gtk::Align::Start);
         content.append(&section_label);
@@ -466,7 +467,7 @@ impl PropertiesPanel {
             let slide_idx = *imp.slide_index.borrow();
             let on_changed = imp.on_property_changed.clone();
 
-            self.build_color_button_row(content, "Fill", &fill.color, move |color| {
+            self.build_color_button_row(content, &gettext("Fill"), &fill.color, move |color| {
                 let Some(doc_rc) = doc_rc.as_ref() else { return };
                 let Some(sel_id) = sel_id else { return };
                 let mut doc = doc_rc.borrow_mut();
@@ -494,7 +495,7 @@ impl PropertiesPanel {
             let slide_idx = *imp.slide_index.borrow();
             let on_changed = imp.on_property_changed.clone();
 
-            self.build_color_button_row(content, "Stroke", &stroke.color, move |color| {
+            self.build_color_button_row(content, &gettext("Stroke"), &stroke.color, move |color| {
                 let Some(doc_rc) = doc_rc.as_ref() else { return };
                 let Some(sel_id) = sel_id else { return };
                 let mut doc = doc_rc.borrow_mut();
@@ -516,7 +517,7 @@ impl PropertiesPanel {
 
             // Stroke width
             let width_row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-            let width_label = gtk::Label::new(Some("Width"));
+            let width_label = gtk::Label::new(Some(&gettext("Width")));
             width_label.add_css_class("dim-label");
             width_label.set_width_chars(6);
             width_label.set_halign(gtk::Align::Start);
