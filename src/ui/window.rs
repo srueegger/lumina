@@ -4,6 +4,7 @@ use gtk::gio;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::format::odp;
 use crate::model::document::Document;
 use crate::model::element::SlideElement;
 use crate::model::geometry::Rect;
@@ -25,7 +26,9 @@ mod imp {
         pub slide_panel: SlidePanel,
         pub properties_panel: PropertiesPanel,
         pub header: adw::HeaderBar,
+        pub title_widget: RefCell<Option<adw::WindowTitle>>,
         pub tool_buttons: RefCell<Vec<(Tool, gtk::ToggleButton)>>,
+        pub file_path: Rc<RefCell<Option<std::path::PathBuf>>>,
     }
 
     impl std::fmt::Debug for LuminaWindow {
@@ -42,7 +45,9 @@ mod imp {
                 slide_panel: SlidePanel::new(),
                 properties_panel: PropertiesPanel::new(),
                 header: adw::HeaderBar::new(),
+                title_widget: RefCell::new(None),
                 tool_buttons: RefCell::new(Vec::new()),
+                file_path: Rc::new(RefCell::new(None)),
             }
         }
     }
@@ -96,6 +101,7 @@ impl LuminaWindow {
         // Header bar
         let title = adw::WindowTitle::new("Lumina", "Untitled Presentation");
         imp.header.set_title_widget(Some(&title));
+        *imp.title_widget.borrow_mut() = Some(title);
 
         // Add slide button in header
         let add_slide_btn = gtk::Button::from_icon_name("list-add-symbolic");
@@ -115,7 +121,14 @@ impl LuminaWindow {
         menu_btn.set_tooltip_text(Some("Menu"));
 
         let menu = gio::Menu::new();
-        menu.append(Some("About Lumina"), Some("app.about"));
+        let file_section = gio::Menu::new();
+        file_section.append(Some("Open..."), Some("win.open"));
+        file_section.append(Some("Save"), Some("win.save"));
+        file_section.append(Some("Save As..."), Some("win.save-as"));
+        menu.append_section(None, &file_section);
+        let about_section = gio::Menu::new();
+        about_section.append(Some("About Lumina"), Some("app.about"));
+        menu.append_section(None, &about_section);
         menu_btn.set_menu_model(Some(&menu));
         imp.header.pack_end(&menu_btn);
 
@@ -222,6 +235,141 @@ impl LuminaWindow {
             &provider,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
+
+        // File actions
+        self.setup_file_actions(doc);
+    }
+
+    fn setup_file_actions(&self, doc: Rc<RefCell<Document>>) {
+        let imp = self.imp();
+
+        // Save action
+        let save_action = gio::ActionEntry::builder("save")
+            .activate({
+                let doc = doc.clone();
+                let file_path = imp.file_path.clone();
+                move |win: &LuminaWindow, _, _| {
+                    let path = file_path.borrow().clone();
+                    if let Some(path) = path {
+                        let doc = doc.borrow();
+                        if let Err(e) = odp::writer::save_document(&doc, &path) {
+                            eprintln!("Save error: {}", e);
+                        }
+                    } else {
+                        // No file path yet, trigger Save As
+                        gio::prelude::ActionGroupExt::activate_action(win, "save-as", None);
+                    }
+                }
+            })
+            .build();
+
+        // Save As action
+        let save_as_action = gio::ActionEntry::builder("save-as")
+            .activate({
+                let doc = doc.clone();
+                let file_path = imp.file_path.clone();
+                let title_widget = imp.title_widget.clone();
+                move |win: &LuminaWindow, _, _| {
+                    let filter = gtk::FileFilter::new();
+                    filter.set_name(Some("ODP Presentation"));
+                    filter.add_mime_type("application/vnd.oasis.opendocument.presentation");
+                    filter.add_pattern("*.odp");
+
+                    let filters = gio::ListStore::new::<gtk::FileFilter>();
+                    filters.append(&filter);
+
+                    let dialog = gtk::FileDialog::builder()
+                        .title("Save Presentation")
+                        .filters(&filters)
+                        .initial_name("presentation.odp")
+                        .build();
+
+                    let doc = doc.clone();
+                    let file_path = file_path.clone();
+                    let title_widget = title_widget.clone();
+                    dialog.save(Some(win), gio::Cancellable::NONE, move |result| {
+                        if let Ok(file) = result {
+                            if let Some(path) = file.path() {
+                                let doc = doc.borrow();
+                                if let Err(e) = odp::writer::save_document(&doc, &path) {
+                                    eprintln!("Save error: {}", e);
+                                    return;
+                                }
+                                let filename = path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("Untitled");
+                                if let Some(title) = title_widget.borrow().as_ref() {
+                                    title.set_subtitle(filename);
+                                }
+                                *file_path.borrow_mut() = Some(path);
+                            }
+                        }
+                    });
+                }
+            })
+            .build();
+
+        // Open action
+        let open_action = gio::ActionEntry::builder("open")
+            .activate({
+                let doc = doc.clone();
+                let file_path = imp.file_path.clone();
+                let title_widget = imp.title_widget.clone();
+                let slide_panel = imp.slide_panel.clone();
+                let canvas = imp.canvas.clone();
+                let props = imp.properties_panel.clone();
+                move |win: &LuminaWindow, _, _| {
+                    let filter = gtk::FileFilter::new();
+                    filter.set_name(Some("ODP Presentation"));
+                    filter.add_mime_type("application/vnd.oasis.opendocument.presentation");
+                    filter.add_pattern("*.odp");
+
+                    let filters = gio::ListStore::new::<gtk::FileFilter>();
+                    filters.append(&filter);
+
+                    let dialog = gtk::FileDialog::builder()
+                        .title("Open Presentation")
+                        .filters(&filters)
+                        .build();
+
+                    let doc = doc.clone();
+                    let file_path = file_path.clone();
+                    let title_widget = title_widget.clone();
+                    let slide_panel = slide_panel.clone();
+                    let canvas = canvas.clone();
+                    let props = props.clone();
+
+                    dialog.open(Some(win), gio::Cancellable::NONE, move |result| {
+                        if let Ok(file) = result {
+                            if let Some(path) = file.path() {
+                                match odp::reader::load_document(&path) {
+                                    Ok(loaded_doc) => {
+                                        *doc.borrow_mut() = loaded_doc;
+                                        let filename = path
+                                            .file_name()
+                                            .and_then(|n| n.to_str())
+                                            .unwrap_or("Untitled");
+                                        if let Some(title) = title_widget.borrow().as_ref() {
+                                            title.set_subtitle(filename);
+                                        }
+                                        *file_path.borrow_mut() = Some(path);
+                                        slide_panel.rebuild_thumbnails();
+                                        canvas.set_current_slide(0);
+                                        props.update_for_selection(None);
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Open error: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            })
+            .build();
+
+        self.add_action_entries([save_action, save_as_action, open_action]);
     }
 
     fn setup_tool_buttons(&self, doc: Rc<RefCell<Document>>) {

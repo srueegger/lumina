@@ -1,5 +1,6 @@
 mod application;
 mod config;
+mod format;
 mod i18n;
 mod model;
 mod render;
