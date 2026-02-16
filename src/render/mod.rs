@@ -1,4 +1,5 @@
 pub mod engine;
 pub mod image_render;
+pub mod pdf_export;
 pub mod shape_render;
 pub mod text_render;

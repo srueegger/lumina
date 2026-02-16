@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::format::odp;
+use crate::render::pdf_export;
 use crate::model::document::Document;
 use crate::model::element::SlideElement;
 use crate::model::geometry::Rect;
@@ -126,6 +127,9 @@ impl LuminaWindow {
         file_section.append(Some("Save"), Some("win.save"));
         file_section.append(Some("Save As..."), Some("win.save-as"));
         menu.append_section(None, &file_section);
+        let export_section = gio::Menu::new();
+        export_section.append(Some("Export as PDF..."), Some("win.export-pdf"));
+        menu.append_section(None, &export_section);
         let about_section = gio::Menu::new();
         about_section.append(Some("About Lumina"), Some("app.about"));
         menu.append_section(None, &about_section);
@@ -369,7 +373,42 @@ impl LuminaWindow {
             })
             .build();
 
-        self.add_action_entries([save_action, save_as_action, open_action]);
+        // Export PDF action
+        let export_pdf_action = gio::ActionEntry::builder("export-pdf")
+            .activate({
+                let doc = doc.clone();
+                move |win: &LuminaWindow, _, _| {
+                    let filter = gtk::FileFilter::new();
+                    filter.set_name(Some("PDF Document"));
+                    filter.add_mime_type("application/pdf");
+                    filter.add_pattern("*.pdf");
+
+                    let filters = gio::ListStore::new::<gtk::FileFilter>();
+                    filters.append(&filter);
+
+                    let dialog = gtk::FileDialog::builder()
+                        .title("Export as PDF")
+                        .filters(&filters)
+                        .initial_name("presentation.pdf")
+                        .build();
+
+                    let doc = doc.clone();
+
+                    dialog.save(Some(win), gio::Cancellable::NONE, move |result| {
+                        if let Ok(file) = result {
+                            if let Some(path) = file.path() {
+                                let doc = doc.borrow();
+                                if let Err(e) = pdf_export::export_pdf(&doc, &path) {
+                                    eprintln!("PDF export error: {}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+            })
+            .build();
+
+        self.add_action_entries([save_action, save_as_action, open_action, export_pdf_action]);
     }
 
     fn setup_tool_buttons(&self, doc: Rc<RefCell<Document>>) {
