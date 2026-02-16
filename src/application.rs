@@ -40,9 +40,42 @@ glib::wrapper! {
 
 impl LuminaApplication {
     pub fn new() -> Self {
-        glib::Object::builder()
+        let app: Self = glib::Object::builder()
             .property("application-id", config::APP_ID)
             .property("flags", gio::ApplicationFlags::FLAGS_NONE)
-            .build()
+            .build();
+
+        app.setup_actions();
+        app
+    }
+
+    fn setup_actions(&self) {
+        let about_action = gio::ActionEntry::builder("about")
+            .activate(|app: &Self, _, _| {
+                app.show_about_dialog();
+            })
+            .build();
+
+        self.add_action_entries([about_action]);
+    }
+
+    fn show_about_dialog(&self) {
+        let window = self.active_window();
+
+        let dialog = adw::AboutDialog::builder()
+            .application_name("Lumina")
+            .application_icon(config::APP_ID)
+            .version(config::VERSION)
+            .developer_name("Samuel Rüegger")
+            .license_type(gtk::License::Gpl20Only)
+            .website("https://rueegger.me")
+            .issue_url("https://github.com/srueegger/lumina/issues")
+            .build();
+
+        dialog.add_link("Email", "mailto:samuel@rueegger.me");
+
+        if let Some(win) = window {
+            dialog.present(Some(&win));
+        }
     }
 }

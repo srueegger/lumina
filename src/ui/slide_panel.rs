@@ -174,7 +174,7 @@ impl SlidePanel {
                 let _ = cr.stroke();
             });
 
-            // Click handler
+            // Click handler - attach to drawing_area so it receives events directly
             let gesture = gtk::GestureClick::new();
             let panel = self.clone();
             let idx = i;
@@ -185,7 +185,7 @@ impl SlidePanel {
                     callback(idx);
                 }
             });
-            frame.add_controller(gesture);
+            drawing_area.add_controller(gesture);
 
             frame.append(&drawing_area);
             frame.append(&label);
