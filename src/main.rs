@@ -3,6 +3,7 @@ mod config;
 mod i18n;
 mod model;
 mod render;
+mod ui;
 
 use gtk::prelude::*;
 
