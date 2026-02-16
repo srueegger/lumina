@@ -46,6 +46,7 @@ impl LuminaApplication {
             .build();
 
         app.setup_actions();
+        app.setup_accels();
         app
     }
 
@@ -56,7 +57,22 @@ impl LuminaApplication {
             })
             .build();
 
-        self.add_action_entries([about_action]);
+        let quit_action = gio::ActionEntry::builder("quit")
+            .activate(|app: &Self, _, _| {
+                app.quit();
+            })
+            .build();
+
+        self.add_action_entries([about_action, quit_action]);
+    }
+
+    fn setup_accels(&self) {
+        self.set_accels_for_action("win.new-presentation", &["<Control>n"]);
+        self.set_accels_for_action("win.open", &["<Control>o"]);
+        self.set_accels_for_action("win.save", &["<Control>s"]);
+        self.set_accels_for_action("win.save-as", &["<Control><Shift>s"]);
+        self.set_accels_for_action("win.export-pdf", &["<Control><Shift>e"]);
+        self.set_accels_for_action("app.quit", &["<Control>q"]);
     }
 
     fn show_about_dialog(&self) {
