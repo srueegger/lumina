@@ -1,0 +1,11 @@
+/target/
+/build/
+/builddir/
+/_build/
+**/*.rs.bk
+*.swp
+*.swo
+*~
+.flatpak-builder/
+.vscode/
+.idea/

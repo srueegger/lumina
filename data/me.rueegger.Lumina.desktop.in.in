@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Lumina
+Comment=Create and edit presentations
+Type=Application
+Exec=@BINARY@
+Icon=@APP_ID@
+Terminal=false
+Categories=Office;Presentation;GTK;
+Keywords=presentation;slides;keynote;powerpoint;odp;pptx;
+StartupNotify=true
+MimeType=application/vnd.oasis.opendocument.presentation;application/vnd.openxmlformats-officedocument.presentationml.presentation;
