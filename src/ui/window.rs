@@ -324,13 +324,25 @@ impl LuminaWindow {
                 let canvas = imp.canvas.clone();
                 let props = imp.properties_panel.clone();
                 move |win: &LuminaWindow, _, _| {
-                    let filter = gtk::FileFilter::new();
-                    filter.set_name(Some("ODP Presentation"));
-                    filter.add_mime_type("application/vnd.oasis.opendocument.presentation");
-                    filter.add_pattern("*.odp");
+                    let odp_filter = gtk::FileFilter::new();
+                    odp_filter.set_name(Some("ODP Presentation"));
+                    odp_filter.add_mime_type("application/vnd.oasis.opendocument.presentation");
+                    odp_filter.add_pattern("*.odp");
+
+                    let pptx_filter = gtk::FileFilter::new();
+                    pptx_filter.set_name(Some("PowerPoint Presentation"));
+                    pptx_filter.add_mime_type("application/vnd.openxmlformats-officedocument.presentationml.presentation");
+                    pptx_filter.add_pattern("*.pptx");
+
+                    let all_filter = gtk::FileFilter::new();
+                    all_filter.set_name(Some("All Presentations"));
+                    all_filter.add_pattern("*.odp");
+                    all_filter.add_pattern("*.pptx");
 
                     let filters = gio::ListStore::new::<gtk::FileFilter>();
-                    filters.append(&filter);
+                    filters.append(&all_filter);
+                    filters.append(&odp_filter);
+                    filters.append(&pptx_filter);
 
                     let dialog = gtk::FileDialog::builder()
                         .title("Open Presentation")
@@ -347,7 +359,13 @@ impl LuminaWindow {
                     dialog.open(Some(win), gio::Cancellable::NONE, move |result| {
                         if let Ok(file) = result {
                             if let Some(path) = file.path() {
-                                match odp::reader::load_document(&path) {
+                                let load_result = if path.extension().and_then(|e| e.to_str()) == Some("pptx") {
+                                    crate::format::pptx::reader::load_document(&path)
+                                } else {
+                                    odp::reader::load_document(&path)
+                                };
+                                let is_pptx = path.extension().and_then(|e| e.to_str()) == Some("pptx");
+                                match load_result {
                                     Ok(loaded_doc) => {
                                         *doc.borrow_mut() = loaded_doc;
                                         let filename = path
@@ -357,7 +375,12 @@ impl LuminaWindow {
                                         if let Some(title) = title_widget.borrow().as_ref() {
                                             title.set_subtitle(filename);
                                         }
-                                        *file_path.borrow_mut() = Some(path);
+                                        // Don't set file_path for PPTX (import only)
+                                        if !is_pptx {
+                                            *file_path.borrow_mut() = Some(path);
+                                        } else {
+                                            *file_path.borrow_mut() = None;
+                                        }
                                         slide_panel.rebuild_thumbnails();
                                         canvas.set_current_slide(0);
                                         props.update_for_selection(None);
