@@ -1,6 +1,8 @@
 mod application;
 mod config;
 mod i18n;
+mod model;
+mod render;
 
 use gtk::prelude::*;
 
